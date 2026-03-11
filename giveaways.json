@@ -1,0 +1,150 @@
+{
+  "giveaways": {
+    "1": {
+      "title": "testoviy",
+      "participants": [
+        {
+          "user_id": 448964986,
+          "username": "lolztea",
+          "full_name": "Егор"
+        },
+        {
+          "user_id": 570922520,
+          "username": "tatarskiy88",
+          "full_name": "Алексей"
+        }
+      ],
+      "is_active": false,
+      "winner": {
+        "user_id": 448964986,
+        "username": "lolztea",
+        "full_name": "Егор"
+      }
+    },
+    "2": {
+      "title": "соси",
+      "description": "",
+      "participants": [],
+      "is_active": true,
+      "winner": null
+    },
+    "3": {
+      "title": "соси",
+      "description": "описание тута",
+      "participants": [
+        {
+          "user_id": 448964986,
+          "username": "lolztea",
+          "full_name": "Егор"
+        },
+        {
+          "user_id": 570922520,
+          "username": "tatarskiy88",
+          "full_name": "Алексей"
+        }
+      ],
+      "is_active": false,
+      "winner": {
+        "user_id": 448964986,
+        "username": "lolztea",
+        "full_name": "Егор"
+      }
+    },
+    "4": {
+      "title": "ыфв",
+      "description": "",
+      "participants": [
+        {
+          "user_id": 448964986,
+          "username": "lolztea",
+          "full_name": "Егор"
+        },
+        {
+          "user_id": 570922520,
+          "username": "tatarskiy88",
+          "full_name": "Алексей"
+        }
+      ],
+      "is_active": false,
+      "winner": {
+        "user_id": 570922520,
+        "username": "tatarskiy88",
+        "full_name": "Алексей"
+      }
+    },
+    "6": {
+      "title": "1.000.000$🙈",
+      "description": "На дт детиш люх",
+      "participants": [
+        {
+          "user_id": 570922520,
+          "username": "tatarskiy88",
+          "full_name": "Алексей"
+        },
+        {
+          "user_id": 448964986,
+          "username": "lolztea",
+          "full_name": "Егор"
+        }
+      ],
+      "is_active": true,
+      "winner": null,
+      "posted_message_id": 207,
+      "posted_chat_id": -5034940986
+    },
+    "12": {
+      "title": "Тутутутутуту",
+      "description": "жестко сосаль",
+      "participants": [
+        {
+          "user_id": 448964986,
+          "username": "lolztea",
+          "full_name": "Егор"
+        }
+      ],
+      "is_active": true,
+      "winner": null,
+      "posted_message_id": 243,
+      "posted_chat_id": -5034940986
+    },
+    "124": {
+      "title": "РОЗЫГРЫШЬ 1КК В ЧЕСТЬ 2УХ ПАПИЩЕКОВ",
+      "description": "результаты 31.02.2028",
+      "participants": [
+        {
+          "user_id": 448964986,
+          "username": "lolztea",
+          "full_name": "Егор"
+        }
+      ],
+      "is_active": true,
+      "winner": null,
+      "posted_message_id": 269,
+      "posted_chat_id": -5034940986
+    },
+    "11": {
+      "title": "1kk",
+      "description": "pososite",
+      "participants": [
+        {
+          "user_id": 570922520,
+          "username": "tatarskiy88",
+          "full_name": "Алексей"
+        },
+        {
+          "user_id": 448964986,
+          "username": "lolztea",
+          "full_name": "Егор"
+        }
+      ],
+      "is_active": false,
+      "winner": {
+        "user_id": 448964986,
+        "username": "lolztea",
+        "full_name": "Егор"
+      },
+      "posted_message_id": 290,
+      "posted_chat_id": -5034940986
+    }
+  }
+}
