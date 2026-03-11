@@ -663,9 +663,9 @@ async def approve_handler(callback: CallbackQuery):
         else:
             await bot.send_message(chat_id=user_id, text=caption)
 
-        await callback.message.edit_caption(
-            caption=(callback.message.caption or "Заявка") + "\n\n✅ Одобрено, ссылка и инструкция отправлены.",
-            reply_markup=None
+        await finish_admin_request_message(
+            callback,
+            "\n\n✅ Одобрено, ссылка и инструкция отправлены."
         )
         await callback.answer("Готово")
     except Exception as e:
@@ -686,14 +686,31 @@ async def reject_handler(callback: CallbackQuery):
             chat_id=user_id,
             text=f"Заявка на {redux_data['title']} отклонена. Проверь, что подписка и доказательства видны нормально, и отправь заново."
         )
-        await callback.message.edit_caption(
-            caption=(callback.message.caption or "Заявка") + "\n\n❌ Отклонено.",
-            reply_markup=None
+
+        await finish_admin_request_message(
+            callback,
+            "\n\n❌ Отклонено."
         )
         await callback.answer("Отклонено")
     except Exception as e:
         await callback.answer("Не удалось отклонить заявку", show_alert=True)
         logging.error(f"Ошибка reject: {e}")
+
+async def finish_admin_request_message(callback: CallbackQuery, status_text: str):
+    try:
+        if callback.message.photo:
+            await callback.message.edit_caption(
+                caption=(callback.message.caption or "Заявка") + status_text,
+                reply_markup=None
+            )
+        else:
+            await callback.message.edit_text(
+                (callback.message.text or "Заявка") + status_text,
+                reply_markup=None
+            )
+    except Exception as e:
+        logging.error(f"Ошибка обновления сообщения заявки: {e}")
+
 
 async def main():
     ensure_giveaways_file()
@@ -703,4 +720,5 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
