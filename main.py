@@ -24,7 +24,7 @@ from aiogram.types import (
 BOT_TOKEN = "8722873029:AAHkbZlZ_TNMa52YVjWZQyKW5pfgMGVn52Q"
 ADMIN_CHAT_ID = -5164672894
 CHANNEL_USERNAME = "@kaylor5rp"
-CHANNEL_ID = -5034940986
+CHANNEL_ID = -3434356931
 COMMON_GIF_PATH = "instruction.gif.mp4"
 GIVEAWAYS_FILE = "giveaways.json"
 ADMIN_IDS = {5034940986, 570922520, 448964986}
@@ -702,4 +702,5 @@ async def main():
 
 
 if __name__ == "__main__":
+
     asyncio.run(main())
