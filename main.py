@@ -6,6 +6,8 @@ import os
 from collections import defaultdict
 from pathlib import Path
 
+
+
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode, ChatMemberStatus
@@ -661,16 +663,14 @@ async def approve_handler(callback: CallbackQuery):
         else:
             await bot.send_message(chat_id=user_id, text=caption)
 
-        await callback.message.edit_text(
-            (callback.message.text or "Заявка") + "\n\n✅ Одобрено, ссылка и инструкция отправлены.",
+        await callback.message.edit_caption(
+            caption=(callback.message.caption or "Заявка") + "\n\n✅ Одобрено, ссылка и инструкция отправлены.",
             reply_markup=None
         )
         await callback.answer("Готово")
     except Exception as e:
         await callback.answer("Не удалось отправить ссылку", show_alert=True)
         logging.error(f"Ошибка approve: {e}")
-
-
 @dp.callback_query(F.data.startswith("reject:"))
 async def reject_handler(callback: CallbackQuery):
     try:
@@ -686,15 +686,14 @@ async def reject_handler(callback: CallbackQuery):
             chat_id=user_id,
             text=f"Заявка на {redux_data['title']} отклонена. Проверь, что подписка и доказательства видны нормально, и отправь заново."
         )
-        await callback.message.edit_text(
-            (callback.message.text or "Заявка") + "\n\n❌ Отклонено.",
+        await callback.message.edit_caption(
+            caption=(callback.message.caption or "Заявка") + "\n\n❌ Отклонено.",
             reply_markup=None
         )
         await callback.answer("Отклонено")
     except Exception as e:
         await callback.answer("Не удалось отклонить заявку", show_alert=True)
         logging.error(f"Ошибка reject: {e}")
-
 
 async def main():
     ensure_giveaways_file()
@@ -704,3 +703,4 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
