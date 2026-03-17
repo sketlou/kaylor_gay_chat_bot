@@ -34,7 +34,7 @@ ADMIN_IDS = {5034940986, 570922520, 448964986}
 REDUXES = {
     "afterlight": {
         "title": "Afterlight",
-        "link": "https://drive.google.com/file/d/1kbVa-lN5a-UJjzs2LtMEPr0Gs0vrnn4A/view?usp=sharing",
+        "link": "https://drive.google.com/file/d/1Zx03juaswcNvtItrsk3SA7kJVWr0qOQQ/view?usp=sharing",
         "button_text": "Afterlight",
         "review_video_link": "https://youtu.be/9Dx4QmYxntY?si=WjI-ru8NWjLWnssO",
     },
