@@ -38,6 +38,12 @@ REDUXES = {
         "button_text": "Afterlight",
         "review_video_link": "https://youtu.be/9Dx4QmYxntY?si=WjI-ru8NWjLWnssO",
     },
+    "rp redux":{
+        "title":"RP Redux",
+        "link":"https://drive.google.com/file/d/1CEkL4ol7PzXbs4-MDYKKSg40E4I9TR_v/view?usp=sharing",
+        "button_text":"RP Redux",
+        "review_video_link":"https://youtu.be/EYmKJhSDIgg",
+    },
 }
 
 logging.basicConfig(level=logging.INFO)
