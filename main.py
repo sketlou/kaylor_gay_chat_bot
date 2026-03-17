@@ -42,7 +42,7 @@ REDUXES = {
         "title":"RP Redux",
         "link":"https://drive.google.com/file/d/1CEkL4ol7PzXbs4-MDYKKSg40E4I9TR_v/view?usp=sharing",
         "button_text":"RP Redux",
-        "review_video_link":"https://youtu.be/EYmKJhSDIgg",
+        "review_video_link":"https://youtu.be/EYmKJhSDIgg?si=MOO0dvzvPCWCirj5",
     },
 }
 
