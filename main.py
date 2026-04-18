@@ -6,9 +6,7 @@ import os
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from telegram import Bot
-from telegram.constants import ParseMode
-from telegram.ext import DefaultBotProperties
+
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode, ChatMemberStatus
@@ -25,14 +23,18 @@ from aiogram.types import (
 )
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
+
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN не найден в переменных окружения")
 
 bot = Bot(
     token=BOT_TOKEN,
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
 )
+dp = Dispatcher()
 
 YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@Kaylor5rp"
 LAST_VIDEO_URL = "https://youtu.be/EYmKJhSDIgg?si=MOO0dvzvPCWCirj5"
