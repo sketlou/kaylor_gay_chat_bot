@@ -21,14 +21,6 @@ from aiogram.types import (
     InputMediaPhoto,
 )
 
-BOT_TOKEN = "8722873029:AAHkbZlZ_TNMa52YVjWZQyKW5pfgMGVn52Q"
-ADMIN_CHAT_ID = -5164672894
-CHANNEL_USERNAME = "@kaylor5rp"
-CHANNEL_ID = "@kaylor5rp"
-#BOT_TOKEN = "8634630633:AAEbv3cg3H9GtPDlsj6_O-FvTChmpFxHH38"
-#ADMIN_CHAT_ID = -5142210602
-#CHANNEL_ID = "@kasdasdadaszxc2"
-
 YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@Kaylor5rp"
 LAST_VIDEO_URL = "https://youtu.be/EYmKJhSDIgg?si=MOO0dvzvPCWCirj5"
 
