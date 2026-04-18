@@ -21,6 +21,11 @@ from aiogram.types import (
     InputMediaPhoto,
 )
 
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")
+CHANNEL_ID = os.getenv("CHANNEL_ID")
+
 YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@Kaylor5rp"
 LAST_VIDEO_URL = "https://youtu.be/EYmKJhSDIgg?si=MOO0dvzvPCWCirj5"
 
