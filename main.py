@@ -649,7 +649,10 @@ async def help_handler(message: Message):
             "/stats - статистика пользователей\n"
             "/broadcast_create ID Текст - создать рассылку\n"
             "/broadcast_preview ID - предпросмотр рассылки тебе в личку\n"
-            "/broadcast_send ID - отправить рассылку всем пользователям"
+            "/broadcast_send ID - отправить рассылку всем пользователям\n"
+            "/broadcast_send_user ID USER_ID - отправить рассылку одному пользователю\n"
+            "/broadcast_delete ID - удалить сохраненную рассылку\n"
+            "/giveaway_delete ID - удалить розыгрыш"
         )
 
     await message.answer(text)
@@ -883,6 +886,81 @@ async def broadcast_send_handler(message: Message):
         )
 
 
+@dp.message(Command("broadcast_send_user"), F.chat.type == "private")
+async def broadcast_send_user_handler(message: Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("Нет доступа.")
+        return
+
+    parts = message.text.split(" ", 2)
+    if len(parts) < 3:
+        await message.answer("Использование:\n/broadcast_send_user ID USER_ID")
+        return
+
+    broadcast_id = parts[1].strip()
+
+    try:
+        target_user_id = int(parts[2].strip())
+    except Exception:
+        await message.answer("USER_ID должен быть числом.")
+        return
+
+    data = load_data()
+    broadcast = data["broadcasts"].get(broadcast_id)
+
+    if not broadcast:
+        await message.answer("Рассылка не найдена.")
+        return
+
+    text = (broadcast.get("text") or "").strip()
+    if not text:
+        await message.answer("У рассылки пустой текст.")
+        return
+
+    try:
+        await bot.send_message(chat_id=target_user_id, text=text)
+
+        data = load_data()
+        if broadcast_id in data["broadcasts"]:
+            data["broadcasts"][broadcast_id]["last_single_sent_at"] = now_utc().isoformat()
+            data["broadcasts"][broadcast_id]["last_single_sent_to"] = target_user_id
+            save_data(data)
+
+        await message.answer(
+            f"Рассылка <code>{broadcast_id}</code> отправлена пользователю <code>{target_user_id}</code>."
+        )
+    except Exception as e:
+        logging.warning(f"Не удалось отправить рассылку {broadcast_id} пользователю {target_user_id}: {e}")
+        await message.answer(
+            f"Не удалось отправить рассылку пользователю <code>{target_user_id}</code>.\n"
+            "Возможно, он не запускал бота или заблокировал его."
+        )
+
+
+@dp.message(Command("broadcast_delete"), F.chat.type == "private")
+async def broadcast_delete_handler(message: Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("Нет доступа.")
+        return
+
+    parts = message.text.split(" ", 1)
+    if len(parts) < 2:
+        await message.answer("Использование:\n/broadcast_delete ID")
+        return
+
+    broadcast_id = parts[1].strip()
+    data = load_data()
+
+    if broadcast_id not in data["broadcasts"]:
+        await message.answer("Рассылка не найдена.")
+        return
+
+    del data["broadcasts"][broadcast_id]
+    save_data(data)
+
+    await message.answer(f"Рассылка <code>{broadcast_id}</code> удалена.")
+
+
 @dp.message(Command("ban"), F.chat.type == "private")
 async def ban_user_handler(message: Message):
     if not is_admin(message.from_user.id):
@@ -978,6 +1056,57 @@ async def giveaway_create_handler(message: Message):
         f"ID: <code>{giveaway_id}</code>\n\n"
         f"Теперь можешь посмотреть его через /giveaway_preview {giveaway_id}"
     )
+
+
+@dp.message(Command("giveaway_delete"), F.chat.type == "private")
+async def giveaway_delete_handler(message: Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("Нет доступа.")
+        return
+
+    parts = message.text.split(" ", 1)
+    if len(parts) < 2:
+        await message.answer("Использование:\n/giveaway_delete ID")
+        return
+
+    giveaway_id = parts[1].strip()
+    data = load_data()
+    giveaway = data["giveaways"].get(giveaway_id)
+
+    if not giveaway:
+        await message.answer("Розыгрыш не найден.")
+        return
+
+    posted_chat_id = giveaway.get("posted_chat_id")
+    posted_message_id = giveaway.get("posted_message_id")
+    result_chat_id = giveaway.get("result_posted_chat_id")
+    result_message_id = giveaway.get("result_posted_message_id")
+
+    del data["giveaways"][giveaway_id]
+    save_data(data)
+
+    cleanup_notes = []
+
+    if posted_chat_id and posted_message_id:
+        try:
+            await bot.edit_message_reply_markup(
+                chat_id=posted_chat_id,
+                message_id=posted_message_id,
+                reply_markup=None,
+            )
+            cleanup_notes.append("кнопка у поста розыгрыша убрана")
+        except Exception as e:
+            logging.warning(f"Не удалось убрать кнопку у удаленного розыгрыша {giveaway_id}: {e}")
+            cleanup_notes.append("кнопку у поста убрать не получилось")
+
+    if result_chat_id and result_message_id:
+        cleanup_notes.append("пост с итогами в канале не удалялся")
+
+    text = f"Розыгрыш <code>{giveaway_id}</code> удален из JSON."
+    if cleanup_notes:
+        text += "\n" + "\n".join(f"• {note}" for note in cleanup_notes)
+
+    await message.answer(text)
 
 
 @dp.message(Command("giveaway_preview"), F.chat.type == "private")
