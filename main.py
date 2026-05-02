@@ -108,6 +108,7 @@ def ensure_data_file():
                     "giveaways": {},
                     "users": {},
                     "banned_users": {},
+                    "broadcasts": {},
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -125,6 +126,23 @@ def migrate_data(data: dict) -> dict:
 
     if "banned_users" not in data or not isinstance(data["banned_users"], dict):
         data["banned_users"] = {}
+
+    if "broadcasts" not in data or not isinstance(data["broadcasts"], dict):
+        data["broadcasts"] = {}
+
+    for broadcast_id, broadcast in data["broadcasts"].items():
+        if not isinstance(broadcast, dict):
+            data["broadcasts"][broadcast_id] = {
+                "text": str(broadcast),
+                "created_at": now_utc().isoformat(),
+                "sent_at": None,
+            }
+            continue
+        broadcast.setdefault("text", "")
+        broadcast.setdefault("created_at", None)
+        broadcast.setdefault("sent_at", None)
+        broadcast.setdefault("sent_count", 0)
+        broadcast.setdefault("failed_count", 0)
 
     for giveaway_id, giveaway in data["giveaways"].items():
         giveaway.setdefault("title", f"Розыгрыш {giveaway_id}")
@@ -289,6 +307,13 @@ def get_verified_until(data: dict, user_id: int):
 def set_user_verified_for_hours(data: dict, user_id: int, hours: int):
     user = get_user_record(data, user_id)
     user["verified_until"] = (now_utc() + timedelta(hours=hours)).isoformat()
+    user["verification_pending"] = False
+    user["verification_collecting"] = False
+
+
+def clear_user_verification(data: dict, user_id: int):
+    user = get_user_record(data, user_id)
+    user["verified_until"] = None
     user["verification_pending"] = False
     user["verification_collecting"] = False
 
@@ -619,8 +644,12 @@ async def help_handler(message: Message):
             "/giveaway_reroll ID - перевыбрать победителя\n"
             "/ban USER_ID [причина] - заблокировать пользователя\n"
             "/unban USER_ID - снять блокировку\n"
-            "/verified USER_ID - проверить срок верификации пользователя\n"
-            "/stats - статистика пользователей"
+            "/unverify USER_ID - удалить верификацию у пользователя\n"
+            "/unverify_all - удалить действующую верификацию у всех\n"
+            "/stats - статистика пользователей\n"
+            "/broadcast_create ID Текст - создать рассылку\n"
+            "/broadcast_preview ID - предпросмотр рассылки тебе в личку\n"
+            "/broadcast_send ID - отправить рассылку всем пользователям"
         )
 
     await message.answer(text)
@@ -659,29 +688,199 @@ async def stats_handler(message: Message):
     )
 
 
-@dp.message(Command("verified"), F.chat.type == "private")
-async def verified_info_handler(message: Message):
+
+@dp.message(Command("unverify"), F.chat.type == "private")
+async def unverify_user_handler(message: Message):
     if not is_admin(message.from_user.id):
         await message.answer("Нет доступа.")
         return
 
     parts = message.text.split(" ", 1)
     if len(parts) < 2:
-        await message.answer("Использование:\n/verified USER_ID")
+        await message.answer("Использование:\n/unverify USER_ID")
         return
 
-    target_user_id = parts[1].strip()
-    data = load_data()
-    user = data["users"].get(target_user_id)
+    try:
+        target_user_id = int(parts[1].strip())
+    except Exception:
+        await message.answer("USER_ID должен быть числом.")
+        return
 
-    if not user or not user.get("verified_until"):
-        await message.answer("У пользователя нет активной верификации.")
+    data = load_data()
+    was_verified = is_user_verified_now(data, target_user_id)
+    clear_user_verification(data, target_user_id)
+    save_data(data)
+
+    verification_photo_buffer.pop(target_user_id, None)
+    task = verification_collect_tasks.pop(target_user_id, None)
+    if task:
+        task.cancel()
+    verification_ack_sent.discard(target_user_id)
+
+    if was_verified:
+        await message.answer(f"Верификация у <code>{target_user_id}</code> удалена.")
+    else:
+        await message.answer(f"У <code>{target_user_id}</code> не было действующей верификации, но статус проверки очищен.")
+
+
+@dp.message(Command("unverify_all"), F.chat.type == "private")
+async def unverify_all_handler(message: Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("Нет доступа.")
+        return
+
+    data = load_data()
+    removed_count = 0
+
+    for user_id_text in list(data.get("users", {}).keys()):
+        try:
+            user_id = int(user_id_text)
+        except Exception:
+            continue
+
+        if is_user_verified_now(data, user_id):
+            clear_user_verification(data, user_id)
+            removed_count += 1
+            verification_photo_buffer.pop(user_id, None)
+            task = verification_collect_tasks.pop(user_id, None)
+            if task:
+                task.cancel()
+            verification_ack_sent.discard(user_id)
+
+    save_data(data)
+    await message.answer(f"Действующая верификация удалена у всех. Затронуто пользователей: <b>{removed_count}</b>.")
+
+
+@dp.message(Command("broadcast_create"), F.chat.type == "private")
+async def broadcast_create_handler(message: Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("Нет доступа.")
+        return
+
+    parts = message.text.split(" ", 2)
+    if len(parts) < 3 or not parts[1].strip() or not parts[2].strip():
+        await message.answer(
+            "Использование:\n"
+            "/broadcast_create ID Текст рассылки\n\n"
+            "Можно писать текст в несколько строк после ID.\n"
+            "Пример:\n"
+            "/broadcast_create news1 Привет! Завтра будет новый розыгрыш."
+        )
+        return
+
+    broadcast_id = parts[1].strip()
+    text = parts[2].strip()
+
+    data = load_data()
+    data["broadcasts"][broadcast_id] = {
+        "text": text,
+        "created_at": now_utc().isoformat(),
+        "sent_at": None,
+        "sent_count": 0,
+        "failed_count": 0,
+    }
+    save_data(data)
+
+    await message.answer(
+        f"Рассылка сохранена.\n"
+        f"ID: <code>{broadcast_id}</code>\n\n"
+        f"Проверь вид через /broadcast_preview {broadcast_id}"
+    )
+
+
+@dp.message(Command("broadcast_preview"), F.chat.type == "private")
+async def broadcast_preview_handler(message: Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("Нет доступа.")
+        return
+
+    parts = message.text.split(" ", 1)
+    if len(parts) < 2:
+        await message.answer("Использование:\n/broadcast_preview ID")
+        return
+
+    broadcast_id = parts[1].strip()
+    data = load_data()
+    broadcast = data["broadcasts"].get(broadcast_id)
+
+    if not broadcast:
+        await message.answer("Рассылка не найдена.")
         return
 
     await message.answer(
-        f"USER_ID: <code>{target_user_id}</code>\n"
-        f"verified_until: <code>{user['verified_until']}</code>"
+        f"<b>Предпросмотр рассылки</b>\n"
+        f"ID: <code>{broadcast_id}</code>\n\n"
+        f"Ниже сообщение ровно в таком виде уйдет пользователям:"
     )
+    await message.answer(broadcast.get("text", ""))
+
+
+@dp.message(Command("broadcast_send"), F.chat.type == "private")
+async def broadcast_send_handler(message: Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("Нет доступа.")
+        return
+
+    parts = message.text.split(" ", 1)
+    if len(parts) < 2:
+        await message.answer("Использование:\n/broadcast_send ID")
+        return
+
+    broadcast_id = parts[1].strip()
+    data = load_data()
+    broadcast = data["broadcasts"].get(broadcast_id)
+
+    if not broadcast:
+        await message.answer("Рассылка не найдена.")
+        return
+
+    text = (broadcast.get("text") or "").strip()
+    if not text:
+        await message.answer("У рассылки пустой текст.")
+        return
+
+    user_ids = sorted(collect_unique_user_ids(data), key=lambda x: int(x) if str(x).isdigit() else 0)
+    if not user_ids:
+        await message.answer("Некому отправлять: список пользователей пуст.")
+        return
+
+    progress_message = await message.answer(
+        f"Начинаю рассылку <code>{broadcast_id}</code>.\n"
+        f"Получателей: <b>{len(user_ids)}</b>"
+    )
+
+    sent_count = 0
+    failed_count = 0
+
+    for user_id_text in user_ids:
+        try:
+            user_id = int(user_id_text)
+            await bot.send_message(chat_id=user_id, text=text)
+            sent_count += 1
+            await asyncio.sleep(0.05)
+        except Exception as e:
+            failed_count += 1
+            logging.warning(f"Не удалось отправить рассылку {broadcast_id} пользователю {user_id_text}: {e}")
+
+    data = load_data()
+    if broadcast_id in data["broadcasts"]:
+        data["broadcasts"][broadcast_id]["sent_at"] = now_utc().isoformat()
+        data["broadcasts"][broadcast_id]["sent_count"] = sent_count
+        data["broadcasts"][broadcast_id]["failed_count"] = failed_count
+        save_data(data)
+
+    try:
+        await progress_message.edit_text(
+            f"Рассылка <code>{broadcast_id}</code> завершена.\n\n"
+            f"Отправлено: <b>{sent_count}</b>\n"
+            f"Ошибок: <b>{failed_count}</b>"
+        )
+    except Exception:
+        await message.answer(
+            f"Рассылка <code>{broadcast_id}</code> завершена.\n\n"
+            f"Отправлено: <b>{sent_count}</b>\n"
+            f"Ошибок: <b>{failed_count}</b>"
+        )
 
 
 @dp.message(Command("ban"), F.chat.type == "private")
