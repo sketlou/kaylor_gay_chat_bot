@@ -37,10 +37,10 @@ bot = Bot(
 dp = Dispatcher()
 
 YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@Kaylor5rp"
-LAST_VIDEO_URL = "https://youtu.be/EYmKJhSDIgg?si=MOO0dvzvPCWCirj5"
+LAST_VIDEO_URL = "https://youtu.be/-QPBPiGByHI?si=NvBN0jgIeWfUGNwK"
 
 COMMON_GIF_PATH = "instruction.gif.mp4"
-DATA_FILE = "giveaways.json"
+DATA_FILE = os.getenv("DATA_FILE", "data/giveaways.json")
 ADMIN_IDS = {5034940986, 570922520, 448964986}
 
 VERIFICATION_HOURS = 72
@@ -99,6 +99,8 @@ def now_utc() -> datetime:
 
 def ensure_data_file():
     path = Path(DATA_FILE)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
     if not path.exists():
         path.write_text(
             json.dumps(
@@ -166,8 +168,15 @@ def load_data() -> dict:
 
 def save_data(data: dict):
     data = migrate_data(data)
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    path = Path(DATA_FILE)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    tmp_path.replace(path)
 
 
 def is_admin(user_id: int) -> bool:
@@ -183,6 +192,62 @@ def get_user_record(data: dict, user_id: int) -> dict:
             "verification_collecting": False,
         }
     return data["users"][uid]
+
+
+def remember_user(data: dict, user) -> bool:
+    if not user:
+        return False
+
+    record = get_user_record(data, user.id)
+    changed = False
+    now_text = now_utc().isoformat()
+
+    fields = {
+        "user_id": user.id,
+        "username": user.username,
+        "full_name": user.full_name,
+    }
+
+    for key, value in fields.items():
+        if record.get(key) != value:
+            record[key] = value
+            changed = True
+
+    if not record.get("first_seen"):
+        record["first_seen"] = now_text
+        changed = True
+
+    record["last_seen"] = now_text
+    changed = True
+    return changed
+
+
+def collect_unique_user_ids(data: dict) -> set[str]:
+    user_ids = set(str(uid) for uid in data.get("users", {}).keys())
+    user_ids.update(str(uid) for uid in data.get("banned_users", {}).keys())
+
+    for giveaway in data.get("giveaways", {}).values():
+        for participant in giveaway.get("participants", []):
+            participant_id = participant.get("user_id")
+            if participant_id is not None:
+                user_ids.add(str(participant_id))
+
+        winner = giveaway.get("winner")
+        if isinstance(winner, dict) and winner.get("user_id") is not None:
+            user_ids.add(str(winner["user_id"]))
+
+    return user_ids
+
+
+def count_active_verified_users(data: dict) -> int:
+    count = 0
+    for user_id in data.get("users", {}).keys():
+        try:
+            if is_user_verified_now(data, int(user_id)):
+                count += 1
+        except Exception:
+            continue
+    return count
 
 
 def is_user_banned(data: dict, user_id: int) -> bool:
@@ -526,6 +591,8 @@ async def flush_verification_photos(user_id: int):
 @dp.message(CommandStart(), F.chat.type == "private")
 async def start_handler(message: Message):
     data = load_data()
+    if remember_user(data, message.from_user):
+        save_data(data)
     await send_start_text(message, data)
 
 
@@ -552,7 +619,8 @@ async def help_handler(message: Message):
             "/giveaway_reroll ID - перевыбрать победителя\n"
             "/ban USER_ID [причина] - заблокировать пользователя\n"
             "/unban USER_ID - снять блокировку\n"
-            "/verified USER_ID - проверить срок верификации пользователя"
+            "/verified USER_ID - проверить срок верификации пользователя\n"
+            "/stats - статистика пользователей"
         )
 
     await message.answer(text)
@@ -569,6 +637,26 @@ async def chatid_handler(message: Message):
 @dp.message(Command("myid"), F.chat.type == "private")
 async def myid_handler(message: Message):
     await message.answer(f"Твой user id: <code>{message.from_user.id}</code>")
+
+
+@dp.message(Command("stats"), F.chat.type == "private")
+async def stats_handler(message: Message):
+    if not is_admin(message.from_user.id):
+        await message.answer("Нет доступа.")
+        return
+
+    data = load_data()
+    if remember_user(data, message.from_user):
+        save_data(data)
+
+    active_verified_count = count_active_verified_users(data)
+    total_unique_users = len(collect_unique_user_ids(data))
+
+    await message.answer(
+        "<b>Статистика пользователей</b>\n\n"
+        f"Действующая верификация: <b>{active_verified_count}</b>\n"
+        f"Уникальных пользователей за все время: <b>{total_unique_users}</b>"
+    )
 
 
 @dp.message(Command("verified"), F.chat.type == "private")
@@ -1077,6 +1165,7 @@ async def join_giveaway_handler(callback: CallbackQuery):
     user_id = callback.from_user.id
 
     data = load_data()
+    remember_user(data, callback.from_user)
     giveaway = data["giveaways"].get(giveaway_id)
 
     if not giveaway:
@@ -1231,6 +1320,8 @@ async def text_router(message: Message):
         return
 
     data = load_data()
+    if remember_user(data, message.from_user):
+        save_data(data)
 
     if is_user_banned(data, user_id):
         reason = get_user_ban_reason(data, user_id)
@@ -1284,6 +1375,8 @@ async def text_router(message: Message):
 async def photo_handler(message: Message):
     user_id = message.from_user.id
     data = load_data()
+    if remember_user(data, message.from_user):
+        save_data(data)
 
     if is_user_banned(data, user_id):
         await message.answer("Ты не можешь отправлять заявки.")
